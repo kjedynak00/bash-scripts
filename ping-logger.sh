@@ -1,19 +1,31 @@
 #!/bin/bash
-# Version 1.0 Ping to  8.8.8.8 and make file if ping failed
-
+# Version 1.0 Ping to 8.8.8.8 and log status changes
+# Version 1.1 added state file and emotes for better log reading
+/home/kacper/logi/logi.txt
 LOGFILE="/mnt/usb-drv/1tb/log.txt"
+STATEFILE="/mnt/usb-drv/1tb/state.txt"
 
-while true
-do
-    # Current timestamp
+# Load previous state if exists
+if [ -f "$STATEFILE" ]; then
+    STATUS=$(cat "$STATEFILE")
+else
+    STATUS="UP"
+fi
+
+while true; do
     TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 
-    # Ping and store result
-    if ! ping -c 1 8.8.8.8 &> /dev/null
-    then
-        echo "$TIMESTAMP - Ping failed" >> "$LOGFILE"
+    if ! ping -c 1 -W 5 8.8.8.8 &> /dev/null; then
+        if [ "$STATUS" != "DOWN" ]; then
+            echo "$TIMESTAMP - 🌐 INTERNET DOWN" >> "$LOGFILE"
+            STATUS="DOWN"
+        fi
+    else
+        if [ "$STATUS" != "UP" ]; then
+            echo "$TIMESTAMP - ✅ INTERNET BACK UP" >> "$LOGFILE"
+            STATUS="UP"
+        fi
     fi
-
-    # Wait before the next check
+    echo "$STATUS" > "$STATEFILE"
     sleep 15
 done

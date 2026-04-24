@@ -3,6 +3,7 @@
 # 14.11.2025 - Drive monitoring added
 # 25.11.2025 - Cpu monitoring added
 # 25.11.2025 - RAM monitoring added
+# 24.04.2025 - Machine uptime and Network traffic (RX/TX bytes per active interface) added
 
 #List of monitored drives
 PARTITION=("/" "/boot")
@@ -32,3 +33,17 @@ if (( $(echo "$RAM_USAGE > 70" | bc -l) )); then
     curl -X POST -H 'Content-type: application/json' --data "{\"content\":\"$MESSAGE\"}" \
     "$WEBHOOK_URL"
 fi
+
+#Machine uptime
+UPTIME=$(uptime -p)
+MESSAGE="🕐 Uptime: ${UPTIME}%"
+    curl -X POST -H 'Content-type: application/json' --data "{\"content\":\"$MESSAGE\"}" \ 
+    "$WEBHOOK_URL"
+
+#Network traffic (RX/TX bytes per active interface)
+IFACE=$(ip route | grep default | awk '{print $5}' | head -1)
+RX=$(cat /sys/class/net/$IFACE/statistics/rx_bytes)
+TX=$(cat /sys/class/net/$IFACE/statistics/tx_bytes)
+MESSAGE="🌐 $IFACE RX: $(numfmt --to=iec $RX) TX: $(numfmt --to=iec $TX)"
+    curl -X POST -H 'Content-type: application/json' --data "{\"content\":\"$MESSAGE\"}" \ 
+    "$WEBHOOK_URL"

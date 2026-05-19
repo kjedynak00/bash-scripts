@@ -1,7 +1,6 @@
 #!/bin/bash
 # Version 1.0 Ping to 8.8.8.8 and log status changes
 # Version 1.1 added state file and emotes for better log reading
-/home/kacper/logi/logi.txt
 LOGFILE="/mnt/usb-drv/1tb/log.txt"
 STATEFILE="/mnt/usb-drv/1tb/state.txt"
 

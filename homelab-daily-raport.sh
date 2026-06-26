@@ -1,4 +1,6 @@
 #!/bin/bash
+# Version 0.1 Added message and dates etc.
+# Version 0.2 Added disk usage and uptime for each node
 
 WEBHOOK_URL="EXAMPLE_WEBHOOK_URL"  # Replace with your actual Discord webhook URL
 DATE=$(date +"%Y-%m-%d %H:%M:%S")

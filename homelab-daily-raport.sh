@@ -1,13 +1,64 @@
 #!/bin/bash
-# Version 0.1 Added message and dates etc.
 
-WEBHOOK_URL="https://example.com/webhook"
-HOSTNAME=$(hostname)
+WEBHOOK_URL="EXAMPLE_WEBHOOK_URL"  # Replace with your actual Discord webhook URL
 DATE=$(date +"%Y-%m-%d %H:%M:%S")
 
-MESSAGE="📊 Daily Homelab Report - $DATE 🖥️ Host: $HOSTNAME"
+HOSTNAME=$(hostname)
 
-curl -X POST \
+node_disk() {
+  local node=$1
+  if [ "$node" = "$HOSTNAME" ]; then
+    df -h / 2>/dev/null | tail -1 | awk '{gsub(/%/,"",$5); print $2, $5}'
+  else
+    local name="node-check-$RANDOM"
+    kubectl run "$name" --image=busybox --restart=Never --privileged \
+      --overrides="$(cat <<EOF
+{"spec":{"nodeName":"$node","containers":[{"name":"c","image":"busybox","command":["chroot","/host","df","-h","/"],"volumeMounts":[{"name":"r","mountPath":"/host"}],"securityContext":{"privileged":true}}],"volumes":[{"name":"r","hostPath":{"path":"/","type":"Directory"}}],"restartPolicy":"Never"}}
+EOF
+)" >/dev/null 2>&1
+    sleep 4
+    kubectl logs "$name" 2>/dev/null | tail -1 | awk '{gsub(/%/,"",$5); print $2, $5}'
+    kubectl delete pod "$name" --now 2>/dev/null
+  fi
+}
+
+node_uptime() {
+  local node=$1
+  if [ "$node" = "$HOSTNAME" ]; then
+    cat /proc/uptime | awk '{d=int($1/86400); h=int(($1%86400)/3600); print d"d "h"h"}'
+  else
+    local name="uptime-check-$RANDOM"
+    kubectl run "$name" --image=busybox --restart=Never --privileged \
+      --overrides="$(cat <<EOF
+{"spec":{"nodeName":"$node","containers":[{"name":"c","image":"busybox","command":["chroot","/host","cat","/proc/uptime"],"volumeMounts":[{"name":"r","mountPath":"/host"}],"securityContext":{"privileged":true}}],"volumes":[{"name":"r","hostPath":{"path":"/","type":"Directory"}}],"restartPolicy":"Never"}}
+EOF
+)" >/dev/null 2>&1
+    sleep 3
+    kubectl logs "$name" 2>/dev/null | awk '{d=int($1/86400); h=int(($1%86400)/3600); print d"d "h"h"}'
+    kubectl delete pod "$name" --now 2>/dev/null
+  fi
+}
+
+REPORT=":computer: **Daily Homelab Report — $DATE**"
+
+REPORT+=$'\n\n**:file_cabinet: Nodes:**'
+for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
+  read -r size used <<< "$(node_disk "$node")"
+  free=$((100 - used))
+  up=$(node_uptime "$node")
+  REPORT+=$'\n'"\u2022 **$node**: ${size} total, ${free}% free — up ${up}"
+done
+
+FAILING=$(kubectl get pods -A --no-headers 2>/dev/null | awk '$4!="Running" && $4!="Completed" {print "`"$1"/"$2"` — "$4}')
+
+if [ -n "$FAILING" ]; then
+  REPORT+=$'\n\n**⚠ Issues:**'
+  while IFS= read -r line; do
+    REPORT+=$'\n'"\u2022 $line"
+  done <<< "$FAILING"
+fi
+
+curl -s -X POST \
   -H "Content-Type: application/json" \
-  --data "$(jq -n --arg content "$MESSAGE" '{content: $content}')" \
+  --data "$(jq -n --arg content "$REPORT" '{content: $content}')" \
   "$WEBHOOK_URL"

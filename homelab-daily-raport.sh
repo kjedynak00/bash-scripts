@@ -20,7 +20,7 @@ EOF
 )" >/dev/null 2>&1
     sleep 4
     kubectl logs "$name" 2>/dev/null | tail -1 | awk '{gsub(/%/,"",$5); print $2, $5}'
-    kubectl delete pod "$name" --now 2>/dev/null
+    kubectl delete pod "$name" --now >/dev/null 2>&1
   fi
 }
 
@@ -37,7 +37,7 @@ EOF
 )" >/dev/null 2>&1
     sleep 3
     kubectl logs "$name" 2>/dev/null | awk '{d=int($1/86400); h=int(($1%86400)/3600); print d"d "h"h"}'
-    kubectl delete pod "$name" --now 2>/dev/null
+    kubectl delete pod "$name" --now >/dev/null 2>&1
   fi
 }
 
@@ -48,15 +48,14 @@ for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
   read -r size used <<< "$(node_disk "$node")"
   free=$((100 - used))
   up=$(node_uptime "$node")
-  REPORT+=$'\n'"\u2022 **$node**: ${size} total, ${free}% free — up ${up}"
+  REPORT+=$'\n'"• **$node**: ${size} total, ${free}% free — up ${up}"
 done
 
-FAILING=$(kubectl get pods -A --no-headers 2>/dev/null | awk '$4!="Running" && $4!="Completed" {print "`"$1"/"$2"` — "$4}')
-
+FAILING=$(kubectl get pods -A --no-headers 2>/dev/null | awk '$4!="Running" && $4!="Completed" && $2!~/^(node-check-|uptime-check-)/ {print "`"$1"/"$2"` — "$4}')
 if [ -n "$FAILING" ]; then
-  REPORT+=$'\n\n**⚠ Issues:**'
+  REPORT+=$'\n\n''**⚠ Issues:**'
   while IFS= read -r line; do
-    REPORT+=$'\n'"\u2022 $line"
+    REPORT+=$'\n'"• $line"
   done <<< "$FAILING"
 fi
 

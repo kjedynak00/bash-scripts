@@ -1,6 +1,7 @@
 #!/bin/bash
 # Version 0.1 Added message and dates etc.
 # Version 0.2 Added disk usage and uptime for each node
+# Version 0.3 Added warning for nodes with less than 20% free disk space
 
 WEBHOOK_URL="EXAMPLE_WEBHOOK_URL"  # Replace with your actual Discord webhook URL
 DATE=$(date +"%Y-%m-%d %H:%M:%S")
@@ -55,8 +56,12 @@ REPORT+=$'\n\n**:file_cabinet: Nodes:**'
 for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}'); do
   read -r size used <<< "$(node_disk "$node")"
   free=$((100 - used))
+  alert=""
+  if [ "$free" -lt 20 ]; then
+    alert=" ⚠️"
+  fi
   up=$(node_uptime "$node")
-  REPORT+=$'\n'"• **$node**: ${size} total, ${free}% free — up ${up}"
+  REPORT+=$'\n'"• **$node**: ${size} total, ${free}% free${alert} — up ${up}"
 done
 
 FAILING=$(kubectl get pods -A --no-headers 2>/dev/null | awk '$4!="Running" && $4!="Completed" && $2!~/^(node-check-|uptime-check-)/ {print "`"$1"/"$2"` — "$4}')
